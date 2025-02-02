@@ -1650,7 +1650,7 @@ func Test_test_client_send_unique_concurrent_requests(t *testing.T) {
 	var mut sync.Mutex
 	correctRequests := 0
 
-	client := NewSendClient(apiKey)
+	client := NewApiKeySendClient(apiKey)
 
 	for i := 0; i < numRequests; i++ {
 		wg.Add(1)
@@ -1723,7 +1723,7 @@ func Test_test_client_send_unique_concurrent_requests(t *testing.T) {
 
 func Test_test_send_client_with_mail_body_compression_enabled(t *testing.T) {
 	apiKey := "SENDGRID_API_KEY"
-	client := NewSendClient(apiKey)
+	client := NewApiKeySendClient(apiKey)
 	headers := map[string]string{"Content-Encoding": "gzip", "X-Mock": "202"}
 
 	emailBytes := []byte(` {
@@ -1872,7 +1872,7 @@ func Test_test_send_client_with_mail_body_compression_enabled(t *testing.T) {
 
 func Test_test_send_client(t *testing.T) {
 	apiKey := "SENDGRID_APIKEY"
-	client := NewSendClient(apiKey)
+	client := NewApiKeySendClient(apiKey)
 
 	emailBytes := []byte(` {
 		"asm": {

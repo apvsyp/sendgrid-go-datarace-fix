@@ -1,8 +1,6 @@
 package sendgrid
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
 	"net/http"
@@ -10,7 +8,6 @@ import (
 	"time"
 
 	"github.com/sendgrid/rest"
-	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 // Version is this client library's current version
@@ -27,11 +24,11 @@ type options struct {
 	Subuser  string
 }
 
-// Client is the Twilio SendGrid Go client
-type Client struct {
-	apiKey       string
-	emailOptions TwilioEmailOptions
-}
+// // Client is the Twilio SendGrid Go client
+// type Client struct {
+// 	apiKey       string
+// 	emailOptions TwilioEmailOptions
+// }
 
 func (o *options) baseURL() string {
 	return o.Host + o.Endpoint
@@ -54,78 +51,6 @@ func requestNew(options options) rest.Request {
 		BaseURL: options.baseURL(),
 		Headers: requestHeaders,
 	}
-}
-
-// Send sends an email through Twilio SendGrid
-func (cl *Client) Send(email *mail.SGMailV3) (*rest.Response, error) {
-	return cl.SendWithContext(context.Background(), email, nil)
-}
-
-// SendWithHeaders sends an email through Twilio SendGrid with request headers
-func (cl *Client) SendWithHeaders(email *mail.SGMailV3, headers map[string]string) (*rest.Response, error) {
-	return cl.SendWithContext(context.Background(), email, headers)
-}
-
-// SendWithContext sends an email through Twilio SendGrid with context.Context.
-func (cl *Client) SendWithContext(ctx context.Context, email *mail.SGMailV3, headers map[string]string) (*rest.Response, error) {
-	request, err := cl.prepareRequest(email, headers)
-	if err != nil {
-		return nil, err
-	}
-	return MakeRequestWithContext(ctx, request)
-}
-
-// sendGetSentReqBodyHeaders sends an email and returns response along with request body
-func (cl *Client) sendGetSentReqBodyHeaders(email *mail.SGMailV3, headers map[string]string) (*rest.Response, []byte, error) {
-	return cl.sendWithContextGetSentReqBodyHeaders(context.Background(), email, headers)
-}
-
-// sendWithContextGetSentReqBodyHeaders sends an email with context and returns response along with request body
-func (cl *Client) sendWithContextGetSentReqBodyHeaders(ctx context.Context, email *mail.SGMailV3, headers map[string]string) (*rest.Response, []byte, error) {
-	request, err := cl.prepareRequest(email, headers)
-	if err != nil {
-		return nil, nil, err
-	}
-	response, err := MakeRequestWithContext(ctx, request)
-	return response, request.Body, err
-}
-
-// prepareRequest prepares the email request with the given headers
-func (cl *Client) prepareRequest(email *mail.SGMailV3, headers map[string]string) (rest.Request, error) {
-	var request rest.Request
-	if cl.apiKey != "" {
-		request = GetRequest(cl.apiKey, "/v3/mail/send", "")
-	} else if cl.emailOptions.Username != "" && cl.emailOptions.Password != "" {
-		request = GetTwilioEmailRequest(cl.emailOptions)
-	} else {
-		return request, errors.New("no API key or username/password")
-	}
-	request.Method = "POST"
-
-	for k, v := range headers {
-		request.Headers[k] = v
-	}
-
-	request.Body = mail.GetRequestBody(email)
-	// when Content-Encoding header is set to "gzip"
-	// mail body is compressed using gzip according to
-	// https://docs.sendgrid.com/api-reference/mail-send/mail-send#mail-body-compression
-	if request.Headers["Content-Encoding"] == "gzip" {
-		var gzipped bytes.Buffer
-		gz := gzip.NewWriter(&gzipped)
-		if _, err := gz.Write(request.Body); err != nil {
-			return request, err
-		}
-		if err := gz.Flush(); err != nil {
-			return request, err
-		}
-		if err := gz.Close(); err != nil {
-			return request, err
-		}
-		request.Body = gzipped.Bytes()
-	}
-
-	return request, nil
 }
 
 // DefaultClient is used if no custom HTTP client is defined
