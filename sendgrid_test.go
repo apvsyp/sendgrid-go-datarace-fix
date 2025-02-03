@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1640,10 +1641,89 @@ func Test_test_mail_batch__batch_id__get(t *testing.T) {
 	assert.Equal(t, 200, response.StatusCode, "Wrong status code returned")
 }
 
+func Test_test_client_send_unique_concurrent_requests(t *testing.T) {
+	// API key for authentication (use environment variables in production)
+	apiKey := "SENDGIRD_APIKEY"
+
+	// Number of concurrent requests to send
+	const numRequests = 10
+
+	// WaitGroup to synchronize goroutines
+	var wg sync.WaitGroup
+
+	// Buffered channel to collect errors from goroutines
+	errors := make(chan error, numRequests)
+
+	// Initialize the email client
+	client := NewSendClient(apiKey)
+
+	// Launch multiple goroutines to send concurrent requests
+	for i := 0; i < numRequests; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// Create sender email details
+			from := &mail.Email{
+				Name:    fmt.Sprintf("#%d Sender", i),
+				Address: "joe.doe@example.com",
+			}
+
+			// Create recipient email details
+			to := &mail.Email{
+				Name:    fmt.Sprintf("Recipient #%d", i),
+				Address: "jane.doe@example.com",
+			}
+
+			// Construct the email message
+			email := &mail.SGMailV3{
+				From: from,
+				Personalizations: []*mail.Personalization{
+					{
+						To:      []*mail.Email{to},
+						Subject: fmt.Sprintf("#%d Hello from thread!", i),
+					},
+				},
+				Content: []*mail.Content{
+					{
+						Type:  "text/plain",
+						Value: fmt.Sprintf("This is a unique message from thread #%d.", i),
+					},
+				},
+			}
+
+			// Send the email request
+			response, err := client.Send(email)
+
+			// Handle potential errors in sending
+			if err != nil {
+				errors <- fmt.Errorf("goroutine %d: send error: %v", i, err)
+				return
+			}
+
+			// Verify the response status code
+			if response.StatusCode != 202 {
+				errors <- fmt.Errorf("goroutine %d: unexpected status code: got %d, want 202, Response: %s",
+					i, response.StatusCode, response.Body)
+				return
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(errors)
+
+	// Process any errors collected from goroutines
+	for err := range errors {
+		if err != nil {
+			t.Errorf("Test failed: %v", err)
+		}
+	}
+}
 func Test_test_send_client_with_mail_body_compression_enabled(t *testing.T) {
 	apiKey := "SENDGRID_API_KEY"
 	client := NewSendClient(apiKey)
-	client.Headers["Content-Encoding"] = "gzip"
 
 	emailBytes := []byte(` {
 		"asm": {
@@ -1780,8 +1860,10 @@ func Test_test_send_client_with_mail_body_compression_enabled(t *testing.T) {
 	email := &mail.SGMailV3{}
 	err := json.Unmarshal(emailBytes, email)
 	assert.Nil(t, err, fmt.Sprintf("Unmarshal error: %v", err))
-	client.Request.Headers["X-Mock"] = "202"
-	response, err := client.Send(email)
+
+	headers := map[string]string{"Content-Encoding": "gzip", "X-Mock": "202"}
+
+	response, err := client.SendWIthHeaders(email, headers)
 	if err != nil {
 		t.Log(err)
 	}
@@ -1929,8 +2011,7 @@ func Test_test_send_client(t *testing.T) {
 	email := &mail.SGMailV3{}
 	err := json.Unmarshal(emailBytes, email)
 	assert.Nil(t, err, fmt.Sprintf("Unmarshal error: %v", err))
-	client.Request.Headers["X-Mock"] = "202"
-	response, err := client.Send(email)
+	response, err := client.SendWIthHeaders(email, map[string]string{"X-Mock": "202"})
 	if err != nil {
 		t.Log(err)
 	}
