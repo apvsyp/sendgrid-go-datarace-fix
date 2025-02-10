@@ -1658,7 +1658,7 @@ func Test_test_client_send_is_thread_safe(t *testing.T) {
 			}
 
 			to := &mail.Email{
-				Name:    fmt.Sprintf("Recipient #%d", i),
+				Name:    "Recipient",
 				Address: "jane.doe@example.com",
 			}
 
