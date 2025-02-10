@@ -56,24 +56,20 @@ func requestNew(options options) rest.Request {
 	}
 }
 
-// Send sends an email through Twilio SendGrid without additional
+// Send sends an email through Twilio SendGrid
 func (cl *Client) Send(email *mail.SGMailV3) (*rest.Response, error) {
 	return cl.SendWithContext(context.Background(), email, nil)
 }
 
-// SendWithHeaders sends an email through Twilio SendGrid with additional headers.
-func (cl *Client) SendWIthHeaders(email *mail.SGMailV3, headers map[string]string) (*rest.Response, error) {
+// SendWithHeaders sends an email through Twilio SendGrid with additional headers
+func (cl *Client) SendWithHeaders(email *mail.SGMailV3, headers map[string]string) (*rest.Response, error) {
 	return cl.SendWithContext(context.Background(), email, headers)
 }
 
-// SendWithContext sends an email through Twilio SendGrid with context.Context.
+// SendWithContext sends an email through Twilio SendGrid with context.Context
 func (cl *Client) SendWithContext(ctx context.Context, email *mail.SGMailV3, headers map[string]string) (*rest.Response, error) {
 	var request rest.Request
 
-	// Determine the authentication method:
-	// 1. If an API key is available, use it to create a request.
-	// 2. If Twilio email options are provided, use them instead.
-	// 3. If neither is available, return an error.
 	if cl.apiKey != "" {
 		request = GetRequest(cl.apiKey, "/v3/mail/send", "")
 	} else if cl.emailOptions != (TwilioEmailOptions{}) {
@@ -82,15 +78,13 @@ func (cl *Client) SendWithContext(ctx context.Context, email *mail.SGMailV3, hea
 		return nil, errors.New("no API key or email options provided")
 	}
 
-	// Set the HTTP method to POST, as required by SendGrid's API.
 	request.Method = "POST"
 
-	// Add any custom headers provided by the caller.
+	// Add any custom headers provided by the caller
 	for k, v := range headers {
 		request.Headers[k] = v
 	}
 
-	// Convert the email object into JSON format to be sent in the request body.
 	request.Body = mail.GetRequestBody(email)
 	// when Content-Encoding header is set to "gzip"
 	// mail body is compressed using gzip according to
